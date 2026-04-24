@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Net-zero Stacked Area</title>
+
+<!-- Office.js: required for Excel add-ins -->
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #fafaf7; }
+  body {
+    font-family: "Inter Tight", Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+  }
+  * { box-sizing: border-box; }
+
+  /* Controls bar at top of task pane */
+  .bar {
+    padding: 10px 14px;
+    background: #1a1f1b;
+    color: #fafaf7;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+  }
+  .bar label {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: #a8c5b0;
+  }
+  .bar input {
+    flex: 1;
+    background: #2a2f2b;
+    border: 1px solid #3a3f3b;
+    color: #fafaf7;
+    padding: 5px 8px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px;
+    border-radius: 3px;
+  }
+  .bar button {
+    background: #4a7c5f;
+    color: #fafaf7;
+    border: none;
+    padding: 6px 12px;
+    font-family: "Inter Tight", sans-serif;
+    font-weight: 500;
+    font-size: 11px;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .bar button:hover { background: #5a8c6f; }
+
+  #status {
+    padding: 6px 14px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    color: #6b7268;
+    background: #f0ede6;
+    border-bottom: 1px solid rgba(26,31,27,0.08);
+  }
+
+  #chart-root {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+</style>
+
+<!-- React + Babel (required for chart.jsx) -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+
+<div class="bar">
+  <label>Range</label>
+  <input id="range-input" value="Sheet1!A1:D27" />
+  <button id="reload-btn">Refresh</button>
+</div>
+<div id="status">Waiting for Excel…</div>
+<div id="chart-root"></div>
+
+<!-- Chart component + themes -->
+<script type="text/babel" src="chart.jsx"></script>
+<script type="text/babel" src="themes.jsx"></script>
+
+<!-- Office.js bridge: read cells, feed them into the chart -->
+<script type="text/babel">
+  const { StackedAreaChart, CHART_THEMES } = window;
+  const root = ReactDOM.createRoot(document.getElementById('chart-root'));
+  const statusEl = document.getElementById('status');
+
+  function setStatus(msg) { statusEl.textContent = msg; }
+
+  // Render chart with custom data array
+  function renderChart(data) {
+    // Monkey-patch the DATA constant the chart reads by passing a fresh theme
+    // that includes the data. Simplest: mutate window-level DATA + re-render.
+    window.__CHART_DATA__ = data;
+    root.render(
+      <StackedAreaChart
+        theme={CHART_THEMES.sequential}
+        width={980}
+        height={600}
+        data={data}
+      />
+    );
+  }
+
+  // Parse cell values -> [{year, scope1, scope2, scope3}, ...]
+  // Assumes header row: Year | Scope 1 | Scope 2 | Scope 3
+  function parseRange(values) {
+    const rows = values.slice(1); // drop header
+    return rows
+      .filter((r) => r[0] != null && r[0] !== '')
+      .map((r) => ({
+        year: Number(r[0]),
+        scope1: Number(r[1]) || 0,
+        scope2: Number(r[2]) || 0,
+        scope3: Number(r[3]) || 0,
+      }));
+  }
+
+  async function loadFromExcel() {
+    const rangeAddress = document.getElementById('range-input').value.trim();
+    setStatus('Reading ' + rangeAddress + '…');
+    try {
+      await Excel.run(async (context) => {
+        const range = context.workbook.worksheets
+          .getItem(rangeAddress.split('!')[0])
+          .getRange(rangeAddress.split('!')[1]);
+        range.load('values');
+        await context.sync();
+        const data = parseRange(range.values);
+        if (data.length === 0) {
+          setStatus('No numeric rows found in ' + rangeAddress);
+          return;
+        }
+        renderChart(data);
+        setStatus('Loaded ' + data.length + ' rows from ' + rangeAddress);
+      });
+    } catch (err) {
+      setStatus('Error: ' + err.message);
+      console.error(err);
+    }
+  }
+
+  // Wait for Office + Babel-transpiled chart.jsx to be ready
+  Office.onReady((info) => {
+    if (info.host !== Office.HostType.Excel) {
+      setStatus('This add-in runs in Excel only.');
+      return;
+    }
+    setStatus('Connected to Excel. Click Refresh to load data.');
+
+    document.getElementById('reload-btn').addEventListener('click', loadFromExcel);
+
+    // Auto-load on start
+    setTimeout(loadFromExcel, 500);
+
+    // Listen for cell edits and auto-refresh
+    Excel.run(async (context) => {
+      const sheets = context.workbook.worksheets;
+      sheets.onChanged.add(async () => {
+        loadFromExcel();
+      });
+      await context.sync();
+    }).catch((e) => console.warn('Auto-refresh listener failed:', e));
+  });
+</script>
+</body>
+</html>
