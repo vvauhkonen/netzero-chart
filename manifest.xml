@@ -13,9 +13,9 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Net-zero Stacked Area Chart" />
   <Description DefaultValue="Modern stacked area chart for Scope 1/2/3 emissions, live-linked to your spreadsheet." />
-  <IconUrl DefaultValue="https://REPLACE-WITH-YOUR-URL/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://REPLACE-WITH-YOUR-URL/icon-80.png" />
-  <SupportUrl DefaultValue="https://REPLACE-WITH-YOUR-URL/" />
+  <IconUrl DefaultValue="https://github.com/vvauhkonen/netzero-chart/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://github.com/vvauhkonen/netzero-chart/icon-80.png" />
+  <SupportUrl DefaultValue="https://github.com/vvauhkonen/netzero-chart/" />
 
   <!-- Host -->
   <Hosts>
@@ -31,7 +31,7 @@
 
   <!-- Default task pane -->
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://REPLACE-WITH-YOUR-URL/taskpane.html" />
+    <SourceLocation DefaultValue="https://github.com/vvauhkonen/netzero-chart/taskpane.html" />
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
